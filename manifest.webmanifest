@@ -1,0 +1,28 @@
+{
+  "id": "/",
+  "name": "أحوال — موجز السحب",
+  "short_name": "أحوال",
+  "description": "موجز أخبار صحيفة أحوال الإلكترونية بأسلوب السحب العمودي",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#071422",
+  "theme_color": "#071422",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
