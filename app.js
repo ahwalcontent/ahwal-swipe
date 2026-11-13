@@ -2,7 +2,8 @@
 (function () {
   "use strict";
 
-  const WP_URL = "https://ahwal.sa/wp-json/wp/v2/posts?per_page=20&_embed=1";
+  const WP_ENDPOINT = "https://ahwal.sa/wp-json/wp/v2/posts";
+  const PAGE_SIZE = 20;
   const RSS_URL = "https://ahwal.sa/feed";
   const TZ = "Asia/Riyadh";
 
@@ -37,6 +38,18 @@
   let hinted = sessionStorage.getItem("ahwal-hinted") === "1";
   let toastTimer = 0;
   let currentSheetItem = null;
+  let lastFetchAt = 0;
+  let fetching = false;
+  let liveSource = "";
+  let feedBound = false;
+  let cardObserver = null;
+  let sentinelObserver = null;
+  let currentPage = 0;
+  let totalPages = 1;
+  let page1Ids = [];
+  let loadingMore = false;
+  let reachedEnd = false;
+  const REFRESH_AFTER_MS = 5 * 60 * 1000;
 
   function snapshot() {
     return window.AHWAL_SNAPSHOT || { items: [] };
@@ -170,44 +183,124 @@
     });
   }
 
-  function enrichFromSnapshot(list) {
-    const byLink = new Map((snapshot().items || []).map((it) => [it.link, it]));
-    return list.map((it) => {
-      const prev = byLink.get(it.link);
-      if (!prev) return it;
-      return {
-        ...it,
-        image: it.image || prev.image,
-        video: it.video || prev.video,
-        content: (it.content && it.content.length > 40 ? it.content : prev.content) || it.content,
-      };
+  function itemSignature(it) {
+    const videoId = (it.video && (it.video.id || it.video.src)) || "";
+    return [it.id, it.title, it.date, it.excerpt, it.content, it.image || "", videoId, (it.categories || []).join(",")].join("\0");
+  }
+
+  function listsEqual(a, b) {
+    if (!a || !b || a.length !== b.length) return false;
+    return a.every((it, i) => itemSignature(it) === itemSignature(b[i]));
+  }
+
+  function fetchOpts(signal) {
+    return { signal, cache: "no-store", credentials: "omit" };
+  }
+
+  function withBust(url) {
+    return url + (url.indexOf("?") >= 0 ? "&" : "?") + "_=" + Date.now();
+  }
+
+  function dedupeById(list) {
+    const seen = new Set();
+    return list.filter((it) => {
+      if (it == null || it.id == null || seen.has(it.id)) return false;
+      seen.add(it.id);
+      return true;
     });
   }
 
-  async function fetchLive() {
+  function wpPageUrl(page) {
+    return withBust(
+      WP_ENDPOINT + "?per_page=" + PAGE_SIZE + "&page=" + page + "&_embed=1"
+    );
+  }
+
+  async function fetchWpPage(page) {
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 8000);
+    const timer = setTimeout(() => ctrl.abort(), 15000);
     try {
-      const res = await fetch(WP_URL, { signal: ctrl.signal });
-      if (res.ok) {
-        const data = await res.json();
-        const parsed = enrichFromSnapshot(parseWpPosts(data));
-        if (parsed.length) return { items: parsed, source: "live" };
+      const res = await fetch(wpPageUrl(page), fetchOpts(ctrl.signal));
+      const total = parseInt(res.headers.get("X-WP-TotalPages") || "0", 10) || 0;
+      if (res.status === 400 || res.status === 404) {
+        return { items: [], totalPages: total || page - 1, done: true };
+      }
+      if (!res.ok) throw new Error("wp-" + res.status);
+      const data = await res.json();
+      const parsed = parseWpPosts(Array.isArray(data) ? data : []);
+      const pages = total || page;
+      return {
+        items: parsed,
+        totalPages: pages,
+        done: parsed.length === 0 || page >= pages,
+      };
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  async function fetchWpByIds(ids) {
+    if (!ids.length) return [];
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 15000);
+    try {
+      const url = withBust(
+        WP_ENDPOINT +
+          "?include=" +
+          ids.map(encodeURIComponent).join(",") +
+          "&per_page=" +
+          ids.length +
+          "&_embed=1"
+      );
+      const res = await fetch(url, fetchOpts(ctrl.signal));
+      if (!res.ok) return [];
+      const data = await res.json();
+      const parsed = parseWpPosts(Array.isArray(data) ? data : []);
+      const order = new Map(ids.map((id, i) => [id, i]));
+      parsed.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
+      return parsed;
+    } catch (_) {
+      return [];
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  function markPagingFromPage1(result) {
+    currentPage = 1;
+    totalPages = result.totalPages || 1;
+    reachedEnd = !!result.done;
+    page1Ids = result.items.map((it) => it.id);
+  }
+
+  async function fetchLive() {
+    try {
+      const result = await fetchWpPage(1);
+      if (result.items.length) {
+        markPagingFromPage1(result);
+        return { items: result.items, source: "live" };
       }
     } catch (_) {
       /* CORS أو الشبكة */
     }
+    reachedEnd = true;
+    currentPage = 0;
+    page1Ids = [];
     try {
-      const res = await fetch(RSS_URL, { signal: ctrl.signal });
-      if (res.ok) {
-        const xml = await res.text();
-        const parsed = enrichFromSnapshot(parseRss(xml));
-        if (parsed.length) return { items: parsed, source: "rss" };
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 10000);
+      try {
+        const res = await fetch(withBust(RSS_URL), fetchOpts(ctrl.signal));
+        if (res.ok) {
+          const xml = await res.text();
+          const parsed = parseRss(xml);
+          if (parsed.length) return { items: parsed, source: "rss" };
+        }
+      } finally {
+        clearTimeout(timer);
       }
     } catch (_) {
       /* الموجز بلا CORS عادة */
-    } finally {
-      clearTimeout(timer);
     }
     return { items: snapshot().items || [], source: "snapshot" };
   }
@@ -265,9 +358,15 @@
   }
 
   function renderDots(total, active) {
-    el.dots.innerHTML = Array.from({ length: total }, (_, i) =>
-      `<span class="${i === active ? "is-on" : ""}"></span>`
-    ).join("");
+    if (total > 24) {
+      el.dots.innerHTML = "";
+      el.dots.hidden = true;
+    } else {
+      el.dots.hidden = false;
+      el.dots.innerHTML = Array.from({ length: total }, (_, i) =>
+        `<span class="${i === active ? "is-on" : ""}"></span>`
+      ).join("");
+    }
     el.counter.textContent = `${toArNum(active + 1)} \u202F/\u202F${toArNum(total)}`;
   }
 
@@ -364,6 +463,7 @@
       sessionStorage.setItem("ahwal-hinted", "1");
       document.getElementById("app").classList.add("hint-hidden");
     }
+    if (index >= items.length - 3) loadMore();
   }
 
   function openSheet(item) {
@@ -425,7 +525,9 @@
     toastTimer = setTimeout(() => el.toast.classList.remove("show"), 2200);
   }
 
-  function bindFeed() {
+  function bindFeedOnce() {
+    if (feedBound) return;
+    feedBound = true;
     el.feed.addEventListener("click", (e) => {
       const more = e.target.closest("[data-more]");
       if (more) {
@@ -445,19 +547,6 @@
       }
     });
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries
-          .filter((en) => en.isIntersecting && en.intersectionRatio >= 0.6)
-          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
-        if (!visible) return;
-        const idx = Number(visible.target.getAttribute("data-index"));
-        if (idx !== activeIndex) setActive(idx);
-      },
-      { root: el.feed, threshold: [0.6, 0.75, 0.9] }
-    );
-    el.feed.querySelectorAll(".card").forEach((c) => observer.observe(c));
-
     document.addEventListener("keydown", (e) => {
       if (el.sheet.classList.contains("open")) {
         if (e.key === "Escape") closeSheet();
@@ -476,19 +565,176 @@
     });
   }
 
-  function paint(list, source) {
+  function observeCards() {
+    if (cardObserver) cardObserver.disconnect();
+    cardObserver = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((en) => en.isIntersecting && en.intersectionRatio >= 0.6)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+        if (!visible) return;
+        const idx = Number(visible.target.getAttribute("data-index"));
+        if (idx !== activeIndex) setActive(idx);
+      },
+      { root: el.feed, threshold: [0.6, 0.75, 0.9] }
+    );
+    el.feed.querySelectorAll(".card").forEach((c) => cardObserver.observe(c));
+    observeSentinel();
+  }
+
+  function ensureSentinel() {
+    let s = document.getElementById("load-sentinel");
+    if (!s) {
+      s = document.createElement("div");
+      s.id = "load-sentinel";
+      s.className = "load-sentinel";
+      s.setAttribute("aria-hidden", "true");
+      s.innerHTML = '<div class="spinner"></div><span>جاري تحميل المزيد…</span>';
+    }
+    el.feed.appendChild(s);
+    s.classList.toggle("is-loading", !!loadingMore);
+    s.hidden = reachedEnd || liveSource !== "live";
+    return s;
+  }
+
+  function observeSentinel() {
+    const s = ensureSentinel();
+    if (sentinelObserver) sentinelObserver.disconnect();
+    if (s.hidden) return;
+    sentinelObserver = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((en) => en.isIntersecting)) loadMore();
+      },
+      { root: el.feed, rootMargin: "0px 0px 300% 0px", threshold: 0.01 }
+    );
+    sentinelObserver.observe(s);
+  }
+
+  function appendCards(extra) {
+    if (!extra.length) return;
+    const start = items.length;
+    items = items.concat(extra);
+    const s = document.getElementById("load-sentinel");
+    const html = extra.map((it, i) => renderCard(it, start + i, items.length)).join("");
+    if (s) s.insertAdjacentHTML("beforebegin", html);
+    else el.feed.insertAdjacentHTML("beforeend", html);
+    renderDots(items.length, activeIndex);
+    observeCards();
+  }
+
+  async function loadMore() {
+    if (loadingMore || fetching || reachedEnd) return;
+    if (liveSource !== "live") return;
+    if (currentPage >= totalPages) {
+      reachedEnd = true;
+      ensureSentinel();
+      return;
+    }
+    loadingMore = true;
+    ensureSentinel();
+    try {
+      const result = await fetchWpPage(currentPage + 1);
+      if (result.totalPages) totalPages = result.totalPages;
+      const existing = new Set(items.map((it) => it.id));
+      const extra = result.items.filter((it) => !existing.has(it.id));
+      if (!result.items.length) {
+        reachedEnd = true;
+      } else {
+        currentPage += 1;
+        if (result.done || currentPage >= totalPages) reachedEnd = true;
+        appendCards(extra);
+      }
+    } catch (_) {
+      /* اسمح بإعادة المحاولة عند الاقتراب مجدداً */
+    } finally {
+      loadingMore = false;
+      ensureSentinel();
+      observeSentinel();
+    }
+  }
+
+  function paint(list, source, opts) {
+    const keepItem = opts && opts.keepItem;
+    const prevId = keepItem && items[activeIndex] ? items[activeIndex].id : null;
+    const prevSheetId = currentSheetItem && currentSheetItem.id;
+    el.feed.querySelectorAll(".card").forEach((card) => pauseVideo(card));
+
     items = list;
+    liveSource = source;
     if (!items.length) {
+      closeSheet();
       el.feed.innerHTML = '<div class="empty"><h2>لا توجد أخبار حالياً</h2><p>تعذّر قراءة الموجز. حاول لاحقاً.</p></div>';
       setStatus(source);
       return;
     }
     if (hinted) document.getElementById("app").classList.add("hint-hidden");
     el.feed.innerHTML = items.map((it, i) => renderCard(it, i, items.length)).join("");
-    renderDots(items.length, 0);
+    bindFeedOnce();
     setStatus(source);
-    bindFeed();
-    setActive(0);
+    ensureSentinel();
+    observeCards();
+
+    let idx = 0;
+    if (prevId != null) {
+      const found = items.findIndex((it) => it.id === prevId);
+      idx = found >= 0 ? found : 0;
+    }
+    setActive(idx);
+    const card = el.feed.querySelector(`.card[data-index="${idx}"]`);
+    if (card) card.scrollIntoView({ behavior: "auto", block: "start" });
+
+    if (prevSheetId != null) {
+      const still = items.find((it) => it.id === prevSheetId);
+      if (!still) closeSheet();
+      else openSheet(still);
+    }
+  }
+
+  async function refreshFeed(opts) {
+    if (fetching || loadingMore) return;
+    fetching = true;
+    try {
+      let result;
+      try {
+        result = await fetchWpPage(1);
+      } catch (_) {
+        result = null;
+      }
+      if (!result || !result.items.length) {
+        if (!items.length) {
+          const live = await fetchLive();
+          lastFetchAt = Date.now();
+          if (live.source !== "snapshot" || !items.length) paint(live.items, live.source);
+        }
+        return;
+      }
+      lastFetchAt = Date.now();
+      const freshIds = new Set(result.items.map((it) => it.id));
+      const disappeared = page1Ids.filter((id) => !freshIds.has(id));
+      const shifted = disappeared.length ? await fetchWpByIds(disappeared) : [];
+      const shiftedIds = new Set(shifted.map((it) => it.id));
+      const later = items.filter(
+        (it) => !freshIds.has(it.id) && !page1Ids.includes(it.id) && !shiftedIds.has(it.id)
+      );
+      const merged = dedupeById(result.items.concat(shifted, later));
+      const loadedPages = currentPage;
+      markPagingFromPage1(result);
+      if (loadedPages > 1) {
+        currentPage = loadedPages;
+        reachedEnd = currentPage >= totalPages;
+      }
+      if (listsEqual(items, merged) && liveSource === "live") {
+        setStatus("live");
+        ensureSentinel();
+        return;
+      }
+      paint(merged, "live", { keepItem: true });
+      if (opts && opts.notify) showToast("تم تحديث الموجز");
+    } catch (_) {
+      /* أبقِ القائمة الحالية إن فشل التحديث */
+    } finally {
+      fetching = false;
+    }
   }
 
   el.sheetBackdrop.addEventListener("click", closeSheet);
@@ -509,18 +755,27 @@
     });
   }
 
+  function maybeRefreshFromForeground() {
+    if (document.visibilityState !== "visible") return;
+    if (!lastFetchAt || Date.now() - lastFetchAt < REFRESH_AFTER_MS) return;
+    refreshFeed({ notify: true });
+  }
+
+  document.addEventListener("visibilitychange", maybeRefreshFromForeground);
+  window.addEventListener("focus", maybeRefreshFromForeground);
+  window.addEventListener("pageshow", (e) => {
+    if (e.persisted) maybeRefreshFromForeground();
+  });
+
   (async function init() {
-    let source = "snapshot";
-    let list = snapshot().items || [];
     try {
       const live = await fetchLive();
-      list = live.items;
-      source = live.source;
+      lastFetchAt = Date.now();
+      paint(live.items, live.source);
     } catch (_) {
-      list = snapshot().items || [];
-      source = "snapshot";
+      lastFetchAt = Date.now();
+      paint(snapshot().items || [], "snapshot");
     }
-    paint(list, source);
     el.loader.classList.add("hidden");
   })();
 })();

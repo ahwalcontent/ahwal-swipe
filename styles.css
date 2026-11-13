@@ -546,6 +546,29 @@ button, a { font-family: inherit; }
   }
 }
 
+
+.load-sentinel {
+  flex: none;
+  min-height: 72px;
+  padding: 16px 20px calc(16px + var(--safe-bottom));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  scroll-snap-align: none;
+}
+.load-sentinel[hidden] { display: none !important; }
+.load-sentinel .spinner {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  opacity: 0;
+}
+.load-sentinel.is-loading .spinner { opacity: 1; }
+
 @media (prefers-reduced-motion: reduce) {
   .feed { scroll-behavior: auto; }
   .swipe-hint svg, .spinner { animation: none; }

@@ -1,5 +1,5 @@
 /* خدمة العمل لتشغيل موجز أحوال دون اتصال (هيكل التطبيق + اللقطة) */
-const CACHE = 'ahwal-swipe-v2';
+const CACHE = 'ahwal-swipe-v4';
 const SHELL = [
   './',
   './index.html',
@@ -33,26 +33,22 @@ self.addEventListener('fetch', (event) => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
 
-  // واجهة ووردبريس: شبكة أولاً ثم تجاهل الفشل (اللقطة في الصفحة)
-  if (url.hostname === 'ahwal.sa' && url.pathname.startsWith('/wp-json/')) {
-    event.respondWith(fetch(req).catch(() => new Response('[]', { headers: { 'Content-Type': 'application/json' } })));
+  // واجهة ووردبريس والموجز: شبكة فقط، بلا تخزين، حتى تظهر الحذف والتعديل فوراً
+  if (url.hostname === 'ahwal.sa' && (url.pathname.startsWith('/wp-json/') || url.pathname === '/feed' || url.pathname.startsWith('/feed'))) {
+    event.respondWith(fetch(req, { cache: 'no-store' }));
     return;
   }
 
   if (url.origin !== self.location.origin) return;
 
+  // ملفات التطبيق: شبكة أولاً عند الاتصال، واللقطة المخزّنة احتياط دون اتصال فقط
   event.respondWith(
-    caches.match(req).then((cached) => {
-      const networked = fetch(req)
-        .then((res) => {
-          if (res && res.ok && res.type === 'basic') {
-            const copy = res.clone();
-            caches.open(CACHE).then((cache) => cache.put(req, copy));
-          }
-          return res;
-        })
-        .catch(() => cached);
-      return cached || networked;
-    })
+    fetch(req).then((res) => {
+      if (res && res.ok && res.type === 'basic') {
+        const copy = res.clone();
+        caches.open(CACHE).then((cache) => cache.put(req, copy));
+      }
+      return res;
+    }).catch(() => caches.match(req).then((cached) => cached || Promise.reject(new Error('offline'))))
   );
 });
