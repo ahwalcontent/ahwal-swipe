@@ -1,5 +1,5 @@
 /* خدمة العمل لتشغيل موجز أحوال دون اتصال (هيكل التطبيق + اللقطة) */
-const CACHE = 'ahwal-swipe-v5';
+const CACHE = 'ahwal-swipe-v6';
 const SHELL = [
   './',
   './index.html',
