@@ -1,3 +1,7 @@
+/*!
+ * جميع الحقوق محفوظة © 2026 صحيفة أحوال الإلكترونية — عبدالله بن صالح بن خميس الكناني
+ * يُمنع نسخ هذا البرنامج أو إعادة استخدامه أو توزيعه دون إذن كتابي من المالك.
+ */
 /* أحوال — موجز السحب. هوية سينمائية: كحلي / تركواز / أخضر، مع الأحمر من شعار الصحيفة */
 :root {
   --navy: #071422;
@@ -500,6 +504,8 @@ button, a { font-family: inherit; }
   font-size: 1.2rem;
 }
 .modal-card p { color: var(--muted); font-size: 14.5px; line-height: 1.8; }
+.modal-card .copyright { margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.12); font-size: 12px; opacity: .8; }
+.loader-copy { position: absolute; bottom: calc(18px + env(safe-area-inset-bottom)); left: 0; right: 0; text-align: center; font-size: 11px; color: var(--muted); opacity: .7; padding: 0 16px; }
 
 .toast {
   position: absolute;
