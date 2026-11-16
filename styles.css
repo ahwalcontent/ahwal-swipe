@@ -584,3 +584,7 @@ button, a { font-family: inherit; }
   .swipe-hint svg, .spinner { animation: none; }
   .sheet, .sheet-backdrop, .toast { transition: none; }
 }
+
+/* رابط دخول المحررين (هادئ داخل نافذة «عن التطبيق») */
+.modal-card .editor-entry { margin-top: 12px; text-align: center; font-size: 13px; }
+.modal-card .editor-entry a { color: var(--teal-light); text-decoration: none; opacity: .85; border-bottom: 1px dashed rgba(126,208,220,.5); padding-bottom: 1px; }

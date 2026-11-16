@@ -3,12 +3,15 @@
  * يُمنع نسخ هذا البرنامج أو إعادة استخدامه أو توزيعه دون إذن كتابي من المالك.
  */
 /* خدمة العمل لتشغيل موجز أحوال دون اتصال (هيكل التطبيق + اللقطة) */
-const CACHE = 'ahwal-swipe-v10';
+const CACHE = 'ahwal-swipe-v11';
 const SHELL = [
   './',
   './index.html',
   './styles.css',
   './app.js',
+  './editor.html',
+  './editor.css',
+  './editor.js',
   './manifest.webmanifest',
   './data/feed-snapshot.json',
   './data/snapshot.js',
@@ -38,6 +41,14 @@ self.addEventListener('fetch', (event) => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
 
+  // لوحة المحررين: أي طلب يحمل بيانات دخول لا يمر عبر الخدمة ولا يُخزَّن أبداً
+  if (req.headers.has('authorization')) return;
+  // رابط العودة من الموقع يحمل كلمة مرور التطبيق في العنوان: شبكة فقط، بلا تخزين
+  if (url.origin === self.location.origin && /editor\.html$/.test(url.pathname) && url.search) {
+    event.respondWith(fetch(req, { cache: 'no-store' }));
+    return;
+  }
+
   // واجهة ووردبريس والموجز: شبكة فقط، بلا تخزين، حتى تظهر الحذف والتعديل فوراً
   if (url.hostname === 'ahwal.sa' && (url.pathname.startsWith('/wp-json/') || url.pathname === '/feed' || url.pathname.startsWith('/feed'))) {
     event.respondWith(fetch(req, { cache: 'no-store' }));
@@ -49,7 +60,7 @@ self.addEventListener('fetch', (event) => {
   // ملفات التطبيق: شبكة أولاً عند الاتصال، واللقطة المخزّنة احتياط دون اتصال فقط
   event.respondWith(
     fetch(req).then((res) => {
-      if (res && res.ok && res.type === 'basic') {
+      if (res && res.ok && res.type === 'basic' && !url.search) {
         const copy = res.clone();
         caches.open(CACHE).then((cache) => cache.put(req, copy));
       }

@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#071422">
+  <meta name="color-scheme" content="dark">
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="copyright" content="جميع الحقوق محفوظة © 2026 صحيفة أحوال الإلكترونية — عبدالله بن صالح بن خميس الكناني">
+  <meta name="author" content="عبدالله بن صالح بن خميس الكناني">
+  <title>أحوال — لوحة المحررين</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="icon" href="favicon.ico" sizes="48x48">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Noto+Kufi+Arabic:wght@600;700;800&display=swap">
+  <link rel="stylesheet" href="editor.css">
+</head>
+<body>
+  <header class="ed-top">
+    <a class="ed-brand" href="./" aria-label="العودة إلى الموجز">
+      <img src="assets/logo-site.png" alt="صحيفة أحوال الإلكترونية" width="720" height="365">
+    </a>
+    <div class="ed-top-title">لوحة المحررين</div>
+    <div class="ed-top-actions">
+      <span class="ed-user hidden" id="who"></span>
+      <button class="ed-icon-btn hidden" id="logout-btn" type="button" aria-label="تسجيل الخروج" title="تسجيل الخروج">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="ed-main">
+    <!-- شاشة الدخول -->
+    <section class="ed-view" id="view-login" hidden>
+      <div class="ed-panel ed-login">
+        <h1>دخول المحررين</h1>
+        <p class="ed-lead">ادخل بحسابك في موقع <strong>ahwal.sa</strong>. الصلاحيات هنا نفس صلاحياتك في الموقع، وكل ما تنشره يظهر في الموقع والتطبيق معًا.</p>
+        <button class="ed-btn ed-btn-primary ed-btn-block" id="connect-btn" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="m10 17 5-5-5-5"/><path d="M15 12H3"/></svg>
+          الدخول عبر حساب الموقع
+        </button>
+        <p class="ed-hint">سيفتح لك الموقع صفحة الموافقة على ربط التطبيق. وافق عليها وترجع هنا تلقائيًا.</p>
+
+        <details class="ed-manual" id="manual">
+          <summary>الربط اليدوي بكلمة مرور التطبيق</summary>
+          <p class="ed-hint">من الموقع: الملف الشخصي ← «كلمات مرور التطبيقات» ← أنشئ كلمة باسم «تطبيق أحوال» وانسخها هنا. لا تستخدم كلمة مرور حسابك الأساسية.</p>
+          <form id="manual-form" autocomplete="off">
+            <label class="ed-field"><span>اسم المستخدم</span><input id="m-user" type="text" inputmode="text" autocapitalize="off" spellcheck="false" required></label>
+            <label class="ed-field"><span>كلمة مرور التطبيق</span><input id="m-pass" type="password" autocapitalize="off" spellcheck="false" required placeholder="xxxx xxxx xxxx xxxx xxxx xxxx"></label>
+            <button class="ed-btn ed-btn-ghost ed-btn-block" type="submit">ربط الحساب</button>
+          </form>
+        </details>
+        <div class="ed-alert hidden" id="login-error" role="alert"></div>
+      </div>
+    </section>
+
+    <!-- مقالاتي -->
+    <section class="ed-view" id="view-list" hidden>
+      <div class="ed-list-head">
+        <h1>مقالاتي</h1>
+        <button class="ed-btn ed-btn-primary" id="new-btn" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          مقال جديد
+        </button>
+      </div>
+      <div class="ed-tabs" id="tabs" role="tablist">
+        <button type="button" role="tab" data-status="any" class="is-on">الكل</button>
+        <button type="button" role="tab" data-status="draft">مسودات</button>
+        <button type="button" role="tab" data-status="pending">قيد المراجعة</button>
+        <button type="button" role="tab" data-status="future">مجدولة</button>
+        <button type="button" role="tab" data-status="publish">منشورة</button>
+      </div>
+      <label class="ed-switch hidden" id="all-authors-wrap"><input type="checkbox" id="all-authors"> عرض مقالات جميع المحررين</label>
+      <div class="ed-alert hidden" id="list-error" role="alert"></div>
+      <ul class="ed-posts" id="posts"></ul>
+      <div class="ed-more"><button class="ed-btn ed-btn-ghost hidden" id="more-btn" type="button">عرض المزيد</button></div>
+    </section>
+
+    <!-- النموذج -->
+    <section class="ed-view" id="view-form" hidden>
+      <div class="ed-form-head">
+        <button class="ed-btn ed-btn-ghost ed-btn-sm" id="back-btn" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="m9 18 6-6-6-6"/></svg>
+          مقالاتي
+        </button>
+        <span class="ed-status-chip" id="form-status"></span>
+      </div>
+      <div class="ed-form-grid">
+        <form class="ed-form ed-panel" id="post-form" autocomplete="off">
+          <label class="ed-field"><span>العنوان</span><input id="f-title" type="text" maxlength="250" required placeholder="عنوان الخبر"></label>
+          <label class="ed-field"><span>المقتطف <small>(يظهر على البطاقة)</small></span><textarea id="f-excerpt" rows="2" maxlength="400" placeholder="سطر أو سطران يلخصان الخبر"></textarea></label>
+
+          <div class="ed-field">
+            <span>نص الخبر</span>
+            <div class="ed-toolbar" id="toolbar" role="toolbar" aria-label="أدوات التنسيق">
+              <button type="button" data-cmd="bold" title="عريض"><b>عريض</b></button>
+              <button type="button" data-cmd="italic" title="مائل"><i>مائل</i></button>
+              <button type="button" data-cmd="h2" title="عنوان فرعي">عنوان</button>
+              <button type="button" data-cmd="h3" title="عنوان أصغر">عنوان صغير</button>
+              <button type="button" data-cmd="ul" title="قائمة نقطية">• قائمة</button>
+              <button type="button" data-cmd="ol" title="قائمة مرقمة">١. قائمة</button>
+              <button type="button" data-cmd="quote" title="اقتباس">❝ اقتباس</button>
+              <button type="button" data-cmd="link" title="رابط">رابط</button>
+              <button type="button" data-cmd="clear" title="إزالة التنسيق">⌫ تنسيق</button>
+            </div>
+            <div class="ed-rich" id="f-body" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="اكتب نص الخبر هنا…"></div>
+          </div>
+
+          <div class="ed-field">
+            <span>التصنيف</span>
+            <input id="cat-search" type="search" placeholder="ابحث عن تصنيف">
+            <div class="ed-chips" id="f-cats"></div>
+          </div>
+
+          <label class="ed-field"><span>الوسوم <small>(افصل بينها بفاصلة)</small></span><input id="f-tags" type="text" placeholder="مثال: الرياض، أمطار"></label>
+
+          <div class="ed-field">
+            <span>الصورة البارزة</span>
+            <div class="ed-media" id="media-box">
+              <div class="ed-media-preview is-empty" id="media-preview"><span>لا توجد صورة</span></div>
+              <div class="ed-media-actions" id="media-actions">
+                <label class="ed-btn ed-btn-ghost ed-btn-sm">📷 الكاميرا<input id="f-camera" type="file" accept="image/*" capture="environment" hidden></label>
+                <label class="ed-btn ed-btn-ghost ed-btn-sm">🖼️ المعرض<input id="f-gallery" type="file" accept="image/*" hidden></label>
+                <button class="ed-btn ed-btn-ghost ed-btn-sm hidden" id="media-remove" type="button">إزالة</button>
+              </div>
+              <p class="ed-hint hidden" id="media-nocap">رفع الصور غير متاح لصلاحيتك. أرسل الخبر للمراجعة وسيضيف المحرر الصورة.</p>
+              <div class="ed-progress hidden" id="media-progress"><div></div></div>
+            </div>
+          </div>
+
+          <label class="ed-field"><span>رابط فيديو <small>(يوتيوب أو غيره — اختياري)</small></span><input id="f-video" type="url" inputmode="url" dir="ltr" placeholder="https://www.youtube.com/watch?v=…"></label>
+
+          <div class="ed-alert hidden" id="form-error" role="alert"></div>
+
+          <div class="ed-actions" id="form-actions">
+            <button class="ed-btn ed-btn-ghost" type="button" data-save="draft" id="btn-draft">حفظ مسودة</button>
+            <button class="ed-btn ed-btn-ghost" type="button" data-save="pending" id="btn-pending">إرسال للمراجعة</button>
+            <button class="ed-btn ed-btn-primary" type="button" data-save="publish" id="btn-publish">نشر</button>
+            <button class="ed-btn ed-btn-ghost ed-mobile-only" type="button" id="btn-preview">معاينة</button>
+            <button class="ed-btn ed-btn-danger" type="button" id="btn-trash">نقل إلى المهملات</button>
+          </div>
+          <p class="ed-hint" id="role-hint"></p>
+        </form>
+
+        <aside class="ed-preview-wrap" id="preview-wrap" aria-label="معاينة البطاقة">
+          <div class="ed-preview-head">
+            <span>معاينة كما تظهر في التطبيق</span>
+            <button class="ed-icon-btn ed-mobile-only" id="preview-close" type="button" aria-label="إغلاق المعاينة">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+            </button>
+          </div>
+          <div class="ed-phone"><div class="ed-phone-screen" id="preview"></div></div>
+        </aside>
+      </div>
+    </section>
+
+    <section class="ed-view" id="view-loading">
+      <div class="ed-spinner" aria-hidden="true"></div>
+    </section>
+  </main>
+
+  <div class="ed-modal hidden" id="confirm" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+    <div class="ed-modal-card">
+      <h2 id="confirm-title">تأكيد</h2>
+      <p id="confirm-text"></p>
+      <div class="ed-actions">
+        <button class="ed-btn ed-btn-danger" id="confirm-yes" type="button">تأكيد</button>
+        <button class="ed-btn ed-btn-ghost" id="confirm-no" type="button">إلغاء</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="ed-modal hidden" id="link-modal" role="dialog" aria-modal="true" aria-labelledby="link-title">
+    <form class="ed-modal-card" id="link-form">
+      <h2 id="link-title">إضافة رابط</h2>
+      <label class="ed-field"><span>الرابط</span><input id="link-url" type="url" dir="ltr" placeholder="https://"></label>
+      <div class="ed-actions">
+        <button class="ed-btn ed-btn-primary" type="submit">إضافة</button>
+        <button class="ed-btn ed-btn-ghost" id="link-cancel" type="button">إلغاء</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="ed-toast" id="toast" role="status"></div>
+  <footer class="ed-foot">جميع الحقوق محفوظة © 2026 صحيفة أحوال الإلكترونية — عبدالله بن صالح بن خميس الكناني</footer>
+
+  <script src="editor.js"></script>
+</body>
+</html>
