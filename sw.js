@@ -3,7 +3,7 @@
  * يُمنع نسخ هذا البرنامج أو إعادة استخدامه أو توزيعه دون إذن كتابي من المالك.
  */
 /* خدمة العمل لتشغيل موجز أحوال دون اتصال (هيكل التطبيق + اللقطة) */
-const CACHE = 'ahwal-swipe-v9';
+const CACHE = 'ahwal-swipe-v10';
 const SHELL = [
   './',
   './index.html',
@@ -15,7 +15,8 @@ const SHELL = [
   './assets/logo-on-dark.png',
   './icons/icon-192.png',
   './icons/icon-512.png',
-  './icons/apple-touch-icon.png'
+  './icons/apple-touch-icon.png',
+  './icons/maskable-512.png'
 ];
 
 self.addEventListener('install', (event) => {
