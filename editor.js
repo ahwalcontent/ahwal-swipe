@@ -373,7 +373,7 @@
     else if (!pub) hint += "ما تكتبه يُرسل للمراجعة، وينشره المحرر بعد الاعتماد.";
     else hint += "يمكنك النشر مباشرة، ويظهر الخبر في الموقع والتطبيق فوراً.";
     $("role-hint").textContent = hint;
-    ["f-title", "f-excerpt", "f-tags", "f-video", "cat-search"].forEach((id) => { $(id).disabled = !editable; });
+    ["f-title", "f-excerpt", "f-tags", "f-video", "cat-search", "f-seo-title", "f-seo-desc", "f-seo-focus"].forEach((id) => { $(id).disabled = !editable; });
     $("f-body").contentEditable = editable ? "true" : "false";
   }
 
@@ -424,6 +424,45 @@
     return d.innerHTML.trim();
   }
 
+
+  const SEO_DESC_MIN = 120;
+  const SEO_DESC_MAX = 156;
+  function updateSeoCount() {
+    const el = $("seo-desc-count");
+    if (!el) return;
+    const n = ($("f-seo-desc").value || "").trim().length;
+    el.textContent = n + " / " + SEO_DESC_MAX;
+    el.classList.remove("is-short", "is-ok", "is-long");
+    if (!n) return;
+    if (n < SEO_DESC_MIN) el.classList.add("is-short");
+    else if (n <= SEO_DESC_MAX) el.classList.add("is-ok");
+    else el.classList.add("is-long");
+  }
+
+  function yoastMetaFromForm() {
+    return {
+      _yoast_wpseo_title: $("f-seo-title").value.trim(),
+      _yoast_wpseo_metadesc: $("f-seo-desc").value.trim(),
+      _yoast_wpseo_focuskw: $("f-seo-focus").value.trim(),
+    };
+  }
+
+  function fillYoast(p) {
+    const meta = (p && p.meta && typeof p.meta === "object") ? p.meta : {};
+    $("f-seo-title").value = meta._yoast_wpseo_title || "";
+    $("f-seo-desc").value = meta._yoast_wpseo_metadesc || "";
+    $("f-seo-focus").value = meta._yoast_wpseo_focuskw || "";
+    updateSeoCount();
+    $("yoast-warn").classList.add("hidden");
+  }
+
+  function isMetaRejected(err) {
+    if (!(err instanceof ApiError)) return false;
+    if (err.code === "rest_invalid_param") return true;
+    const msg = (err.message || "").toLowerCase();
+    return err.status === 400 && /\bmeta\b/.test(msg);
+  }
+
   function resetForm() {
     $("post-form").reset();
     $("f-body").innerHTML = "";
@@ -433,6 +472,7 @@
     showAlert("form-error", "");
     setMediaPreview("");
     $("cat-search").value = "";
+    fillYoast(null);
   }
 
   function openNew() {
@@ -465,6 +505,7 @@
       if (p.featured_media && media && !media.code) state.featured = { id: p.featured_media, url: bigImageOf(media) };
       else if (p.featured_media) state.featured = { id: p.featured_media, url: "" };
       setMediaPreview(state.featured && state.featured.url);
+      fillYoast(p);
       renderCats();
       applyButtons();
       show("form");
@@ -573,13 +614,27 @@
         categories: Array.from(state.selectedCats),
         tags: tags.ids,
         featured_media: state.featured ? state.featured.id : 0,
+        meta: yoastMetaFromForm(),
       };
       const path = state.post ? "/posts/" + state.post.id : "/posts";
-      const { data: saved } = await api(path, { method: "POST", body: payload });
+      let saved;
+      let yoastSkipped = false;
+      try {
+        saved = (await api(path, { method: "POST", body: payload })).data;
+      } catch (err) {
+        if (!isMetaRejected(err)) throw err;
+        delete payload.meta;
+        saved = (await api(path, { method: "POST", body: payload })).data;
+        yoastSkipped = true;
+        $("yoast-warn").classList.remove("hidden");
+      }
       state.post = saved;
       state.dirty = false;
+      if (!yoastSkipped) $("yoast-warn").classList.add("hidden");
       const msg = { publish: "تم النشر ✓", future: "تمت الجدولة ✓", pending: "أُرسل للمراجعة ✓", draft: "حُفظت المسودة ✓", private: "تم الحفظ ✓" }[saved.status] || "تم الحفظ ✓";
-      toast(tags.skipped.length ? msg + " — لم تُضف وسوم جديدة: " + tags.skipped.join("، ") : msg);
+      let note = tags.skipped.length ? msg + " — لم تُضف وسوم جديدة: " + tags.skipped.join("، ") : msg;
+      if (yoastSkipped) note += " — حقول Yoast لم تُحفظ (حدّث إضافة الموقع إلى 1.0.3).";
+      toast(note);
       applyButtons();
       if (saved.status === "publish") setTimeout(openList, 900);
     } catch (err) {
@@ -731,6 +786,8 @@
     });
     $("cat-search").addEventListener("input", renderCats);
     ["f-title", "f-excerpt", "f-video", "f-tags"].forEach((id) => $(id).addEventListener("input", schedulePreview));
+    $("f-seo-desc").addEventListener("input", updateSeoCount);
+    ["f-seo-title", "f-seo-desc", "f-seo-focus"].forEach((id) => $(id).addEventListener("input", () => { state.dirty = true; }));
 
     const body = $("f-body");
     try { document.execCommand("defaultParagraphSeparator", false, "p"); } catch (e) { /* قديم */ }

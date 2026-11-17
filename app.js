@@ -54,6 +54,12 @@
   let loadingMore = false;
   let reachedEnd = false;
   const REFRESH_AFTER_MS = 5 * 60 * 1000;
+  const SOUND_KEY = "ahwal-sound";
+  const YT_PLAYER_W = 1280;
+  const YT_PLAYER_H = 720;
+  let soundUnlocked = false;
+  let ytApiPromise = null;
+  let ytResizeObs = null;
 
   function snapshot() {
     return window.AHWAL_SNAPSHOT || { items: [] };
@@ -309,6 +315,32 @@
     return { items: snapshot().items || [], source: "snapshot" };
   }
 
+  function soundWanted() {
+    return localStorage.getItem(SOUND_KEY) !== "off";
+  }
+  function setSoundWanted(on) {
+    localStorage.setItem(SOUND_KEY, on ? "on" : "off");
+  }
+
+  function loadYtApi() {
+    if (ytApiPromise) return ytApiPromise;
+    ytApiPromise = new Promise((resolve) => {
+      if (window.YT && window.YT.Player) { resolve(); return; }
+      const prev = window.onYouTubeIframeAPIReady;
+      window.onYouTubeIframeAPIReady = function () {
+        if (typeof prev === "function") prev();
+        resolve();
+      };
+      const s = document.createElement("script");
+      s.src = "https://www.youtube.com/iframe_api";
+      s.async = true;
+      s.onerror = () => resolve();
+      document.head.appendChild(s);
+      setTimeout(resolve, 5000);
+    });
+    return ytApiPromise;
+  }
+
   function ytUrl(id, { mute = true, autoplay = true } = {}) {
     const params = new URLSearchParams({
       autoplay: autoplay ? "1" : "0",
@@ -317,6 +349,7 @@
       rel: "0",
       modestbranding: "1",
       enablejsapi: "1",
+      vq: "hd1080",
       origin: location.origin,
     });
     return "https://www.youtube-nocookie.com/embed/" + encodeURIComponent(id) + "?" + params.toString();
@@ -332,7 +365,7 @@
       ? `<div class="video-stage">
           <div class="video-frame" data-video='${escapeHtml(JSON.stringify(item.video))}'>
             ${item.image ? `<img class="video-poster" src="${escapeHtml(item.image)}" alt="">` : ""}
-            <button class="unmute-btn hidden" type="button" data-unmute>${ICONS.soundOff}<span>تشغيل الصوت</span></button>
+            <button class="unmute-btn" type="button" data-unmute aria-pressed="false" aria-label="تشغيل الصوت">${ICONS.soundOff}<span>تشغيل الصوت</span></button>
           </div>
         </div>`
       : "";
@@ -392,51 +425,293 @@
     }
   }
 
-  function postToYt(iframe, func) {
+  function postToYt(iframe, func, args) {
     if (!iframe || !iframe.contentWindow) return;
     iframe.contentWindow.postMessage(
-      JSON.stringify({ event: "command", func, args: [] }),
+      JSON.stringify({ event: "command", func: func, args: args || [] }),
       "*"
     );
   }
 
-  function playVideo(card, unmute) {
+  function startYtListening(iframe) {
+    if (!iframe || !iframe.contentWindow) return;
+    iframe.contentWindow.postMessage(JSON.stringify({ event: "listening", id: iframe.id || "" }), "*");
+  }
+
+  function isYtOrigin(origin) {
+    try {
+      const h = new URL(origin).hostname.replace(/^www\./, "");
+      return h === "youtube.com" || h === "youtube-nocookie.com";
+    } catch {
+      return typeof origin === "string" && origin.indexOf("youtube") !== -1;
+    }
+  }
+
+  function forceHd(target) {
+    if (!target) return;
+    const qualities = ["highres", "hd1080", "hd720"];
+    if (typeof target.setPlaybackQuality === "function") {
+      qualities.forEach((q) => { try { target.setPlaybackQuality(q); } catch (_) {} });
+      try {
+        if (typeof target.setPlaybackQualityRange === "function") {
+          target.setPlaybackQualityRange("hd1080", "highres");
+        }
+      } catch (_) {}
+      return;
+    }
+    qualities.forEach((q) => postToYt(target, "setPlaybackQuality", [q]));
+  }
+
+  function applySoundToPlayer(target, on) {
+    if (!target) return;
+    if (typeof target.unMute === "function") {
+      try {
+        if (on) { target.unMute(); target.setVolume(100); }
+        else target.mute();
+      } catch (_) {}
+      return;
+    }
+    if (on) {
+      postToYt(target, "unMute");
+      postToYt(target, "setVolume", [100]);
+    } else {
+      postToYt(target, "mute");
+    }
+  }
+
+  function fitYtIframe(frame) {
+    const iframe = frame && frame.querySelector("iframe");
+    if (!iframe || !frame.clientWidth) return;
+    const scale = Math.min(frame.clientWidth / YT_PLAYER_W, frame.clientHeight / YT_PLAYER_H);
+    iframe.setAttribute("width", String(YT_PLAYER_W));
+    iframe.setAttribute("height", String(YT_PLAYER_H));
+    iframe.style.width = YT_PLAYER_W + "px";
+    iframe.style.height = YT_PLAYER_H + "px";
+    iframe.style.transform = "scale(" + scale + ")";
+    iframe.style.transformOrigin = "0 0";
+  }
+
+  function ensureYtResizeObserver() {
+    if (ytResizeObs || typeof ResizeObserver === "undefined") return;
+    ytResizeObs = new ResizeObserver((entries) => {
+      entries.forEach((en) => fitYtIframe(en.target));
+    });
+  }
+
+  function updateSoundBtn(frame, on) {
+    const btn = frame && frame.querySelector("[data-unmute]");
+    if (!btn) return;
+    btn.classList.remove("hidden");
+    btn.setAttribute("aria-pressed", on ? "true" : "false");
+    btn.setAttribute("aria-label", on ? "كتم الصوت" : "تشغيل الصوت");
+    btn.title = on ? "كتم الصوت" : "تشغيل الصوت";
+    btn.innerHTML = on
+      ? ICONS.soundOn + "<span>كتم الصوت</span>"
+      : ICONS.soundOff + "<span>تشغيل الصوت</span>";
+    btn.classList.toggle("is-on", !!on);
+  }
+
+  function applySoundToCard(card, on) {
+    const frame = card && card.querySelector(".video-frame");
+    if (!frame) return;
+    const player = frame._ytPlayer;
+    const iframe = frame.querySelector("iframe");
+    const video = frame.querySelector("video");
+    applySoundToPlayer(player || iframe, on);
+    if (video) {
+      video.muted = !on;
+      if (on) {
+        video.volume = 1;
+        video.play().catch(() => {});
+      }
+    }
+    updateSoundBtn(frame, on);
+  }
+
+  function applySoundToActive(on) {
+    const card = el.feed && el.feed.querySelector(".card.is-active");
+    if (card) applySoundToCard(card, on);
+  }
+
+  function unlockSoundFromGesture() {
+    if (soundUnlocked) return;
+    soundUnlocked = true;
+    if (soundWanted()) applySoundToActive(true);
+  }
+
+  function bindGestureUnlock() {
+    const mark = () => unlockSoundFromGesture();
+    document.addEventListener("pointerdown", mark, { capture: true, passive: true });
+    document.addEventListener("touchstart", mark, { capture: true, passive: true });
+    document.addEventListener("keydown", mark, { capture: true });
+    if (el.feed) el.feed.addEventListener("scroll", mark, { capture: true, passive: true });
+  }
+
+  function playYtCommand(frame, func) {
+    const player = frame._ytPlayer;
+    if (player && typeof player[func] === "function") {
+      try { player[func](); } catch (_) {}
+      return;
+    }
+    postToYt(frame.querySelector("iframe"), func);
+  }
+
+  function scheduleUnmuteFallback(frame) {
+    clearTimeout(frame._ytFallback);
+    frame._ytPlaying = false;
+    frame._ytFallback = setTimeout(() => {
+      if (frame._ytPlaying || soundUnlocked) return;
+      applySoundToPlayer(frame._ytPlayer || frame.querySelector("iframe"), false);
+      playYtCommand(frame, "playVideo");
+      updateSoundBtn(frame, false);
+    }, 1200);
+  }
+
+  function onYtReady(frame, player) {
+    if (player) frame._ytPlayer = player;
+    const target = player || frame.querySelector("iframe");
+    forceHd(target);
+    if (soundWanted()) applySoundToPlayer(target, true);
+    playYtCommand(frame, "playVideo");
+    if (soundWanted() && !soundUnlocked) scheduleUnmuteFallback(frame);
+  }
+
+  function onYtState(frame, player, state) {
+    if (player) frame._ytPlayer = player;
+    const target = player || frame.querySelector("iframe");
+    forceHd(target);
+    if (state === 1) {
+      frame._ytPlaying = true;
+      forceHd(target);
+      if (soundWanted() && soundUnlocked) applySoundToPlayer(target, true);
+      let audible = soundWanted() && soundUnlocked;
+      if (player && typeof player.isMuted === "function") {
+        try { audible = !player.isMuted(); } catch (_) {}
+      }
+      updateSoundBtn(frame, audible);
+    } else if (state === 3) {
+      forceHd(target);
+    }
+  }
+
+  function bindYtPlayer(iframe, frame) {
+    const hookPostMessage = () => {
+      const ping = () => startYtListening(iframe);
+      const startPings = () => {
+        ping();
+        let n = 0;
+        const t = setInterval(() => {
+          if (frame._ytReady || ++n > 20) clearInterval(t);
+          else ping();
+        }, 250);
+      };
+      if (iframe.src && iframe.src !== "about:blank") startPings();
+      iframe.addEventListener("load", startPings);
+    };
+    loadYtApi().then(() => {
+      if (window.YT && window.YT.Player) {
+        try {
+          frame._ytPlayer = new YT.Player(iframe, {
+            events: {
+              onReady: (e) => { frame._ytReady = true; onYtReady(frame, e.target); },
+              onStateChange: (e) => onYtState(frame, e.target, e.data),
+              onPlaybackQualityChange: (e) => {
+                if (e.data !== "hd1080" && e.data !== "highres" && e.data !== "hd720") forceHd(e.target);
+              },
+            },
+          });
+        } catch (_) { /* نستخدم postMessage */ }
+      }
+    });
+    hookPostMessage();
+  }
+
+  window.addEventListener("message", (e) => {
+    if (!e.data || !isYtOrigin(e.origin)) return;
+    let data = e.data;
+    if (typeof data === "string") {
+      try { data = JSON.parse(data); } catch (_) { return; }
+    }
+    if (!data || !data.event) return;
+    if (!el.feed) return;
+    let frame = null;
+    el.feed.querySelectorAll(".video-frame iframe").forEach((iframe) => {
+      if (iframe.contentWindow === e.source) frame = iframe.closest(".video-frame");
+    });
+    if (!frame) return;
+    if (data.event === "onReady") {
+      frame._ytReady = true;
+      onYtReady(frame, frame._ytPlayer);
+    }
+    const state = data.event === "onStateChange" ? data.info
+      : (data.info && typeof data.info.playerState === "number" ? data.info.playerState : null);
+    if (typeof state === "number") onYtState(frame, frame._ytPlayer, state);
+  });
+
+  function playVideo(card) {
     const frame = card.querySelector(".video-frame");
     if (!frame) return;
     const data = JSON.parse(frame.getAttribute("data-video") || "{}");
-    const btn = frame.querySelector("[data-unmute]");
+    const startUnmuted = soundWanted();
     if (data.type === "youtube" && data.id) {
       let iframe = frame.querySelector("iframe");
+      const fresh = !iframe;
       if (!iframe) {
         iframe = document.createElement("iframe");
+        iframe.id = "yt-" + data.id + "-" + Date.now();
+        iframe.className = "yt-hd";
         iframe.setAttribute("allow", "autoplay; encrypted-media; picture-in-picture; fullscreen");
         iframe.setAttribute("allowfullscreen", "");
+        iframe.setAttribute("width", String(YT_PLAYER_W));
+        iframe.setAttribute("height", String(YT_PLAYER_H));
         iframe.title = "فيديو";
         frame.appendChild(iframe);
+        ensureYtResizeObserver();
+        if (ytResizeObs) ytResizeObs.observe(frame);
       }
-      iframe.src = ytUrl(data.id, { mute: !unmute, autoplay: true });
-      if (btn) {
-        btn.classList.toggle("hidden", !!unmute);
-        btn.innerHTML = unmute ? ICONS.soundOn + "<span>الصوت</span>" : ICONS.soundOff + "<span>تشغيل الصوت</span>";
-      }
+      iframe.src = ytUrl(data.id, { mute: !startUnmuted, autoplay: true });
+      fitYtIframe(frame);
+      if (fresh) bindYtPlayer(iframe, frame);
+      updateSoundBtn(frame, startUnmuted);
+      if (startUnmuted && !soundUnlocked) scheduleUnmuteFallback(frame);
     } else if (data.type === "mp4" && data.src) {
       let video = frame.querySelector("video");
       if (!video) {
         video = document.createElement("video");
         video.playsInline = true;
+        video.setAttribute("playsinline", "");
         video.loop = true;
+        video.preload = "auto";
         video.src = data.src;
         frame.appendChild(video);
       }
-      video.muted = !unmute;
-      video.play().catch(() => {});
-      if (btn) btn.classList.toggle("hidden", false);
+      const playMuted = () => {
+        video.muted = true;
+        updateSoundBtn(frame, false);
+        return video.play().catch(() => {});
+      };
+      if (startUnmuted) {
+        video.muted = false;
+        video.volume = 1;
+        video.play().then(() => updateSoundBtn(frame, true)).catch(() => playMuted());
+      } else {
+        playMuted();
+      }
     }
   }
 
   function pauseVideo(card) {
     const frame = card.querySelector(".video-frame");
     if (!frame) return;
+    clearTimeout(frame._ytFallback);
+    if (frame._ytPlayer) {
+      try { if (frame._ytPlayer.pauseVideo) frame._ytPlayer.pauseVideo(); } catch (_) {}
+      try { if (frame._ytPlayer.destroy) frame._ytPlayer.destroy(); } catch (_) {}
+      frame._ytPlayer = null;
+    }
+    frame._ytReady = false;
+    frame._ytPlaying = false;
+    if (ytResizeObs) try { ytResizeObs.unobserve(frame); } catch (_) {}
     const iframe = frame.querySelector("iframe");
     if (iframe) {
       postToYt(iframe, "pauseVideo");
@@ -457,7 +732,7 @@
     cards.forEach((card, i) => {
       const on = i === index;
       card.classList.toggle("is-active", on);
-      if (on) playVideo(card, false);
+      if (on) playVideo(card);
       else pauseVideo(card);
     });
     activeIndex = index;
@@ -545,9 +820,11 @@
       }
       const unmute = e.target.closest("[data-unmute]");
       if (unmute) {
-        const card = unmute.closest(".card");
-        playVideo(card, true);
-        unmute.classList.add("hidden");
+        e.preventDefault();
+        soundUnlocked = true;
+        const on = unmute.getAttribute("aria-pressed") !== "true";
+        setSoundWanted(on);
+        applySoundToCard(unmute.closest(".card"), on);
       }
     });
 
@@ -770,6 +1047,9 @@
   window.addEventListener("pageshow", (e) => {
     if (e.persisted) maybeRefreshFromForeground();
   });
+
+  loadYtApi();
+  bindGestureUnlock();
 
   (async function init() {
     try {

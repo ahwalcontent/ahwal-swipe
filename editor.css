@@ -236,6 +236,34 @@ button, input, textarea, select { font-family: inherit; font-size: 16px; }
 
 .ed-foot { text-align: center; font-size: 11px; color: var(--muted); opacity: .65; padding: 8px 16px calc(12px + var(--safe-bottom)); }
 
+
+/* حقول Yoast SEO */
+.ed-seo {
+  margin: 6px 0 16px;
+  padding: 14px 14px 8px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(7, 20, 34, 0.45);
+}
+.ed-seo legend {
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: 14.5px;
+  padding: 0 8px;
+  color: var(--teal-light);
+}
+.ed-seo > .ed-hint { margin-top: 0; margin-bottom: 12px; }
+.ed-counter {
+  font-size: 12px;
+  color: var(--muted);
+  align-self: flex-end;
+  font-weight: 600;
+}
+.ed-counter.is-short { color: var(--amber); }
+.ed-counter.is-ok { color: var(--green); }
+.ed-counter.is-long { color: #ff9a9a; }
+#yoast-warn { color: #ffe9b8; }
+
 /* تابلت والأجهزة القابلة للطي عند الفتح */
 @media (min-width: 640px) {
   .ed-posts { grid-template-columns: repeat(2, minmax(0, 1fr)); }

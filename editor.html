@@ -133,6 +133,19 @@
 
           <label class="ed-field"><span>رابط فيديو <small>(يوتيوب أو غيره — اختياري)</small></span><input id="f-video" type="url" inputmode="url" dir="ltr" placeholder="https://www.youtube.com/watch?v=…"></label>
 
+          <fieldset class="ed-seo" id="yoast-box">
+            <legend>تحسين محركات البحث (Yoast)</legend>
+            <p class="ed-hint">هذه الحقول هي نفسها حقول Yoast في الموقع، وتظهر في نتائج البحث.</p>
+            <label class="ed-field"><span>عنوان SEO</span><input id="f-seo-title" type="text" maxlength="70" placeholder="يُستخدم في نتائج قوقل إن تُرك العنوان العادي غير مناسب"></label>
+            <label class="ed-field">
+              <span>الوصف التعريفي <small>(يُفضَّل بين ١٢٠ و١٥٦ حرفاً)</small></span>
+              <textarea id="f-seo-desc" rows="3" maxlength="200" placeholder="ملخص يظهر تحت العنوان في نتائج البحث"></textarea>
+              <span class="ed-counter" id="seo-desc-count" aria-live="polite">0 / 156</span>
+            </label>
+            <label class="ed-field"><span>الكلمة المفتاحية المركّزة</span><input id="f-seo-focus" type="text" maxlength="80" placeholder="الكلمة أو العبارة الأساسية للخبر"></label>
+            <p class="ed-hint hidden" id="yoast-warn">الخبر حُفظ، لكن حقول Yoast لم تُحفظ لأن الموقع لم يفعّل حفظها عبر الواجهة بعد. ارفع إضافة «Ahwal Editor API» الإصدار 1.0.3 إلى الموقع ثم احفظ مرة أخرى.</p>
+          </fieldset>
+
           <div class="ed-alert hidden" id="form-error" role="alert"></div>
 
           <div class="ed-actions" id="form-actions">
