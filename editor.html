@@ -81,49 +81,89 @@
 
     <!-- النموذج -->
     <section class="ed-view" id="view-form" hidden>
-      <div class="ed-form-head">
-        <button class="ed-btn ed-btn-ghost ed-btn-sm" id="back-btn" type="button">
+      <div class="ed-bar" id="form-actions">
+        <button class="ed-btn ed-btn-ghost ed-btn-sm" id="back-btn" type="button" title="العودة إلى مقالاتي">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="m9 18 6-6-6-6"/></svg>
-          مقالاتي
+          <span class="ed-hide-xs">مقالاتي</span>
         </button>
         <span class="ed-status-chip" id="form-status"></span>
+        <span class="ed-autosave" id="autosave-note" aria-live="polite"></span>
+        <span class="ed-bar-gap"></span>
+        <button class="ed-btn ed-btn-ghost ed-btn-sm" type="button" data-save="draft" id="btn-draft">حفظ مسودة</button>
+        <button class="ed-btn ed-btn-ghost ed-btn-sm" type="button" id="btn-preview">معاينة</button>
+        <button class="ed-btn ed-btn-ghost ed-btn-sm" type="button" id="btn-site" title="يحفظ المسودة ثم يفتحها في موقع أحوال"><span class="ed-hide-xs">معاينة على </span>الموقع ↗</button>
+        <button class="ed-btn ed-btn-ghost ed-btn-sm" type="button" data-save="pending" id="btn-pending">إرسال للمراجعة</button>
+        <button class="ed-btn ed-btn-ghost ed-btn-sm" type="button" id="btn-schedule">جدولة</button>
+        <button class="ed-btn ed-btn-primary ed-btn-sm" type="button" data-save="publish" id="btn-publish">نشر</button>
       </div>
+      <div class="ed-alert is-info hidden" id="restore-banner" role="status"></div>
       <div class="ed-form-grid">
         <form class="ed-form ed-panel" id="post-form" autocomplete="off">
           <label class="ed-field"><span>العنوان</span><input id="f-title" type="text" maxlength="250" required placeholder="عنوان الخبر"></label>
+
+          <div class="ed-field ed-dateline-field">
+            <span>سطر الترويسة <small>(يظهر أول سطر في الخبر — عدّله كما تريد)</small></span>
+            <div class="ed-dateline-row">
+              <input id="f-city" type="text" list="cities" maxlength="40" placeholder="المدينة" aria-label="المدينة">
+              <input id="f-dateline" type="text" maxlength="160" placeholder="أحوال - المدينة - اسم المحرر" aria-label="سطر الترويسة">
+              <button class="ed-btn ed-btn-ghost ed-btn-sm" id="dateline-auto" type="button" title="إعادة التعبئة التلقائية من المدينة واسمك">تلقائي</button>
+            </div>
+            <datalist id="cities"></datalist>
+          </div>
+
           <label class="ed-field"><span>المقتطف <small>(يظهر على البطاقة)</small></span><textarea id="f-excerpt" rows="2" maxlength="400" placeholder="سطر أو سطران يلخصان الخبر"></textarea></label>
 
           <div class="ed-field">
-            <span>نص الخبر</span>
+            <span>نص الخبر <small>(الصق النص والصور مباشرة، أو اسحب الصور إلى هنا)</small></span>
             <div class="ed-toolbar" id="toolbar" role="toolbar" aria-label="أدوات التنسيق">
-              <button type="button" data-cmd="bold" title="عريض"><b>عريض</b></button>
-              <button type="button" data-cmd="italic" title="مائل"><i>مائل</i></button>
-              <button type="button" data-cmd="h2" title="عنوان فرعي">عنوان</button>
-              <button type="button" data-cmd="h3" title="عنوان أصغر">عنوان صغير</button>
+              <button type="button" data-cmd="undo" title="تراجع">↶</button>
+              <button type="button" data-cmd="redo" title="إعادة">↷</button>
+              <span class="ed-tsep"></span>
+              <button type="button" data-cmd="h2" title="عنوان فرعي">ع٢</button>
+              <button type="button" data-cmd="h3" title="عنوان أصغر">ع٣</button>
+              <button type="button" data-cmd="bold" title="عريض"><b>B</b></button>
+              <button type="button" data-cmd="italic" title="مائل"><i>I</i></button>
               <button type="button" data-cmd="ul" title="قائمة نقطية">• قائمة</button>
               <button type="button" data-cmd="ol" title="قائمة مرقمة">١. قائمة</button>
-              <button type="button" data-cmd="quote" title="اقتباس">❝ اقتباس</button>
-              <button type="button" data-cmd="link" title="رابط">رابط</button>
-              <button type="button" data-cmd="clear" title="إزالة التنسيق">⌫ تنسيق</button>
+              <button type="button" data-cmd="quote" title="اقتباس">❝</button>
+              <button type="button" data-cmd="link" title="رابط">🔗</button>
+              <button type="button" data-cmd="unlink" title="إزالة الرابط">⛓̸</button>
+              <span class="ed-tsep"></span>
+              <button type="button" data-cmd="align-right" title="محاذاة لليمين">⇥</button>
+              <button type="button" data-cmd="align-center" title="توسيط">≡</button>
+              <button type="button" data-cmd="align-left" title="محاذاة لليسار">⇤</button>
+              <button type="button" data-cmd="align-justify" title="ضبط">☰</button>
+              <button type="button" data-cmd="ltr" title="فقرة من اليسار لليمين (للنص الإنجليزي)">LTR</button>
+              <span class="ed-tsep"></span>
+              <button type="button" data-cmd="image" title="إدراج صورة">🖼️ صورة</button>
+              <button type="button" data-cmd="gallery" title="معرض صور">🗂️ معرض</button>
+              <button type="button" data-cmd="embed" title="فيديو يوتيوب أو تغريدة">▶ تضمين</button>
+              <button type="button" data-cmd="clear" title="إزالة التنسيق">⌫</button>
             </div>
-            <div class="ed-rich" id="f-body" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="اكتب نص الخبر هنا…"></div>
+            <div class="ed-dateline-pv hidden" id="dateline-pv" aria-hidden="true"></div>
+            <div class="ed-rich" id="f-body" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="اكتب نص الخبر هنا… أو الصق خبرًا كاملًا بصوره"></div>
+            <input id="f-body-img" type="file" accept="image/*" multiple hidden>
+            <input id="f-gal-img" type="file" accept="image/*" multiple hidden>
+            <span class="ed-counter" id="word-count"></span>
           </div>
 
           <div class="ed-field">
             <span>التصنيف</span>
             <input id="cat-search" type="search" placeholder="ابحث عن تصنيف">
             <div class="ed-chips" id="f-cats"></div>
+            <label class="ed-inline-field hidden" id="primary-wrap"><span>التصنيف الرئيسي (Yoast)</span><select id="f-primary-cat"></select></label>
           </div>
 
           <label class="ed-field"><span>الوسوم <small>(افصل بينها بفاصلة)</small></span><input id="f-tags" type="text" placeholder="مثال: الرياض، أمطار"></label>
 
           <div class="ed-field">
-            <span>الصورة البارزة</span>
+            <span>الصورة البارزة <small>(اسحبها أو الصقها هنا)</small></span>
             <div class="ed-media" id="media-box">
-              <div class="ed-media-preview is-empty" id="media-preview"><span>لا توجد صورة</span></div>
+              <div class="ed-media-preview is-empty ed-drop" id="media-preview" tabindex="0"><span>لا توجد صورة — اسحب صورة أو الصقها هنا</span></div>
               <div class="ed-media-actions" id="media-actions">
                 <label class="ed-btn ed-btn-ghost ed-btn-sm">📷 الكاميرا<input id="f-camera" type="file" accept="image/*" capture="environment" hidden></label>
                 <label class="ed-btn ed-btn-ghost ed-btn-sm">🖼️ المعرض<input id="f-gallery" type="file" accept="image/*" hidden></label>
+                <button class="ed-btn ed-btn-ghost ed-btn-sm" id="media-paste" type="button">📋 لصق</button>
                 <button class="ed-btn ed-btn-ghost ed-btn-sm hidden" id="media-remove" type="button">إزالة</button>
               </div>
               <p class="ed-hint hidden" id="media-nocap">رفع الصور غير متاح لصلاحيتك. أرسل الخبر للمراجعة وسيضيف المحرر الصورة.</p>
@@ -131,40 +171,82 @@
             </div>
           </div>
 
-          <label class="ed-field"><span>رابط فيديو <small>(يوتيوب أو غيره — اختياري)</small></span><input id="f-video" type="url" inputmode="url" dir="ltr" placeholder="https://www.youtube.com/watch?v=…"></label>
+          <label class="ed-field"><span>فيديو الخبر الرئيسي <small>(يوتيوب أو غيره — يظهر في التطبيق، اختياري)</small></span><input id="f-video" type="url" inputmode="url" dir="ltr" placeholder="https://www.youtube.com/watch?v=…"></label>
 
-          <fieldset class="ed-seo" id="yoast-box">
-            <legend>تحسين محركات البحث (Yoast)</legend>
-            <p class="ed-hint">هذه الحقول هي نفسها حقول Yoast في الموقع، وتظهر في نتائج البحث.</p>
-            <label class="ed-field"><span>عنوان SEO</span><input id="f-seo-title" type="text" maxlength="70" placeholder="يُستخدم في نتائج قوقل إن تُرك العنوان العادي غير مناسب"></label>
-            <label class="ed-field">
-              <span>الوصف التعريفي <small>(يُفضَّل بين ١٢٠ و١٥٦ حرفاً)</small></span>
-              <textarea id="f-seo-desc" rows="3" maxlength="200" placeholder="ملخص يظهر تحت العنوان في نتائج البحث"></textarea>
-              <span class="ed-counter" id="seo-desc-count" aria-live="polite">0 / 156</span>
-            </label>
-            <label class="ed-field"><span>الكلمة المفتاحية المركّزة</span><input id="f-seo-focus" type="text" maxlength="80" placeholder="الكلمة أو العبارة الأساسية للخبر"></label>
-            <p class="ed-hint hidden" id="yoast-warn">الخبر حُفظ، لكن حقول Yoast لم تُحفظ لأن الموقع لم يفعّل حفظها عبر الواجهة بعد. ارفع إضافة «Ahwal Editor API» الإصدار 1.0.3 إلى الموقع ثم احفظ مرة أخرى.</p>
-          </fieldset>
+          <section class="ed-seo" id="yoast-box" aria-labelledby="yoast-h">
+            <div class="ed-seo-head">
+              <h2 id="yoast-h">Yoast SEO</h2>
+              <span class="ed-score" id="seo-score"></span>
+            </div>
+            <div class="ed-seo-tabs" role="tablist">
+              <button type="button" class="is-on" data-seotab="seo">البحث</button>
+              <button type="button" data-seotab="analysis">التحليل</button>
+              <button type="button" data-seotab="social">التواصل الاجتماعي</button>
+              <button type="button" data-seotab="adv">متقدم</button>
+            </div>
+
+            <div class="ed-seo-pane" data-pane="seo">
+              <label class="ed-field"><span>الكلمة المفتاحية الرئيسية</span><input id="f-seo-focus" type="text" maxlength="80" placeholder="الكلمة أو العبارة الأساسية للخبر"></label>
+              <div class="ed-snippet" id="snippet" aria-label="معاينة نتيجة قوقل">
+                <div class="sn-head"><span class="sn-fav"><img src="favicon.ico" alt=""></span><span><b>أحوال</b><span class="sn-url" id="sn-url" dir="ltr"></span></span></div>
+                <div class="sn-title" id="sn-title"></div>
+                <div class="sn-desc" id="sn-desc"></div>
+              </div>
+              <div class="ed-meter"><span>طول العنوان</span><div class="ed-bar-meter"><i id="title-meter"></i></div></div>
+              <div class="ed-meter"><span>طول الوصف</span><div class="ed-bar-meter"><i id="desc-meter"></i></div></div>
+              <label class="ed-field">
+                <span>عنوان SEO <small>(اتركه فارغاً لاستخدام قالب الموقع: العنوان | أحوال)</small></span>
+                <input id="f-seo-title" type="text" maxlength="200" placeholder="%%title%% %%sep%% %%sitename%%">
+                <span class="ed-vars">
+                  <button type="button" data-var="%%title%%">+ العنوان</button>
+                  <button type="button" data-var="%%sep%%">+ الفاصل</button>
+                  <button type="button" data-var="%%sitename%%">+ اسم الموقع</button>
+                  <button type="button" data-var="%%primary_category%%">+ التصنيف الرئيسي</button>
+                </span>
+                <span class="ed-counter" id="seo-title-count"></span>
+              </label>
+              <label class="ed-field"><span>الاسم اللطيف (Slug) <small>(روابط الموقع بالرقم: ahwal.sa/archives/رقم)</small></span><input id="f-slug" type="text" maxlength="200" dir="auto" placeholder="مثال: riyadh-rain-alert"></label>
+              <label class="ed-field">
+                <span>الوصف التعريفي <small>(يُفضَّل بين ١٢٠ و١٥٦ حرفاً)</small></span>
+                <textarea id="f-seo-desc" rows="3" maxlength="320" placeholder="ملخص يظهر تحت العنوان في نتائج البحث"></textarea>
+                <span class="ed-counter" id="seo-desc-count" aria-live="polite">0 / 156</span>
+              </label>
+            </div>
+
+            <div class="ed-seo-pane hidden" data-pane="analysis">
+              <p class="ed-hint">فحص تقريبي مستوحى من Yoast يُحدَّث أثناء الكتابة. <strong>ليس تقييم Yoast الفعلي</strong>؛ التقييم الرسمي يظهر داخل ووردبريس.</p>
+              <ul class="ed-checks" id="seo-checks"></ul>
+            </div>
+
+            <div class="ed-seo-pane hidden" data-pane="social">
+              <h3 class="ed-sub">فيسبوك وواتساب (Open Graph)</h3>
+              <label class="ed-field"><span>عنوان المشاركة</span><input id="f-og-title" type="text" maxlength="200" placeholder="يُستخدم عنوان SEO إن تُرك فارغاً"></label>
+              <label class="ed-field"><span>وصف المشاركة</span><textarea id="f-og-desc" rows="2" maxlength="300" placeholder="يُستخدم الوصف التعريفي إن تُرك فارغاً"></textarea></label>
+              <div class="ed-field"><span>صورة المشاركة <small>(الافتراضي: الصورة البارزة)</small></span><div class="ed-social-img" data-social="og"></div></div>
+              <h3 class="ed-sub">إكس (تويتر)</h3>
+              <label class="ed-field"><span>عنوان التغريدة</span><input id="f-tw-title" type="text" maxlength="200" placeholder="يُستخدم عنوان المشاركة إن تُرك فارغاً"></label>
+              <label class="ed-field"><span>وصف التغريدة</span><textarea id="f-tw-desc" rows="2" maxlength="300"></textarea></label>
+              <div class="ed-field"><span>صورة التغريدة</span><div class="ed-social-img" data-social="tw"></div></div>
+            </div>
+
+            <div class="ed-seo-pane hidden" data-pane="adv">
+              <label class="ed-field"><span>السماح لمحركات البحث بإظهار الخبر؟</span>
+                <select id="f-noindex"><option value="">الافتراضي (نعم)</option><option value="2">نعم</option><option value="1">لا (noindex)</option></select>
+              </label>
+              <label class="ed-switch"><input type="checkbox" id="f-nofollow"> منع تتبع الروابط في هذا الخبر (nofollow)</label>
+              <label class="ed-switch"><input type="checkbox" id="f-cornerstone"> محتوى أساسي (Cornerstone)</label>
+              <label class="ed-field"><span>الرابط القانوني (Canonical)</span><input id="f-canonical" type="url" dir="ltr" placeholder="اتركه فارغاً ليكون رابط الخبر نفسه"></label>
+            </div>
+            <p class="ed-hint hidden" id="yoast-warn"></p>
+          </section>
 
           <div class="ed-alert hidden" id="form-error" role="alert"></div>
-
-          <div class="ed-actions" id="form-actions">
-            <button class="ed-btn ed-btn-ghost" type="button" data-save="draft" id="btn-draft">حفظ مسودة</button>
-            <button class="ed-btn ed-btn-ghost" type="button" data-save="pending" id="btn-pending">إرسال للمراجعة</button>
-            <button class="ed-btn ed-btn-primary" type="button" data-save="publish" id="btn-publish">نشر</button>
-            <button class="ed-btn ed-btn-ghost ed-mobile-only" type="button" id="btn-preview">معاينة</button>
-            <button class="ed-btn ed-btn-danger" type="button" id="btn-trash">نقل إلى المهملات</button>
-          </div>
           <p class="ed-hint" id="role-hint"></p>
+          <div class="ed-danger-zone"><button class="ed-btn ed-btn-danger ed-btn-sm" type="button" id="btn-trash">نقل إلى المهملات</button></div>
         </form>
 
         <aside class="ed-preview-wrap" id="preview-wrap" aria-label="معاينة البطاقة">
-          <div class="ed-preview-head">
-            <span>معاينة كما تظهر في التطبيق</span>
-            <button class="ed-icon-btn ed-mobile-only" id="preview-close" type="button" aria-label="إغلاق المعاينة">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
-            </button>
-          </div>
+          <div class="ed-preview-head"><span>معاينة كما تظهر في التطبيق</span></div>
           <div class="ed-phone"><div class="ed-phone-screen" id="preview"></div></div>
         </aside>
       </div>
@@ -186,15 +268,44 @@
     </div>
   </div>
 
-  <div class="ed-modal hidden" id="link-modal" role="dialog" aria-modal="true" aria-labelledby="link-title">
-    <form class="ed-modal-card" id="link-form">
-      <h2 id="link-title">إضافة رابط</h2>
-      <label class="ed-field"><span>الرابط</span><input id="link-url" type="url" dir="ltr" placeholder="https://"></label>
+  <div class="ed-modal hidden" id="prompt-modal" role="dialog" aria-modal="true" aria-labelledby="prompt-title">
+    <form class="ed-modal-card" id="prompt-form">
+      <h2 id="prompt-title">إضافة رابط</h2>
+      <label class="ed-field"><span id="prompt-label">الرابط</span><input id="prompt-input" type="url" dir="ltr" placeholder="https://"></label>
       <div class="ed-actions">
-        <button class="ed-btn ed-btn-primary" type="submit">إضافة</button>
-        <button class="ed-btn ed-btn-ghost" id="link-cancel" type="button">إلغاء</button>
+        <button class="ed-btn ed-btn-primary" type="submit" id="prompt-ok">إضافة</button>
+        <button class="ed-btn ed-btn-ghost" id="prompt-cancel" type="button">إلغاء</button>
       </div>
     </form>
+  </div>
+
+  <div class="ed-modal hidden" id="sched-modal" role="dialog" aria-modal="true" aria-labelledby="sched-title">
+    <form class="ed-modal-card" id="sched-form">
+      <h2 id="sched-title">جدولة النشر</h2>
+      <p>اختر وقت النشر بتوقيت الرياض. يُنشر الخبر تلقائياً في الموقع والتطبيق في هذا الوقت.</p>
+      <label class="ed-field"><span>التاريخ والوقت (الرياض)</span><input id="sched-at" type="datetime-local" required></label>
+      <div class="ed-actions">
+        <button class="ed-btn ed-btn-primary" type="submit">جدولة</button>
+        <button class="ed-btn ed-btn-ghost" id="sched-cancel" type="button">إلغاء</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="ed-modal ed-modal-full hidden" id="pv-modal" role="dialog" aria-modal="true" aria-label="معاينة الخبر">
+    <div class="ed-pv-card">
+      <div class="ed-pv-top">
+        <div class="ed-seo-tabs" id="pv-tabs">
+          <button type="button" class="is-on" data-pv="article">صفحة الخبر</button>
+          <button type="button" data-pv="card">بطاقة التطبيق</button>
+          <button type="button" data-pv="google">نتيجة قوقل</button>
+        </div>
+        <button class="ed-btn ed-btn-ghost ed-btn-sm" type="button" id="pv-site">معاينة على الموقع ↗</button>
+        <button class="ed-icon-btn" id="pv-close" type="button" aria-label="إغلاق المعاينة">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="ed-pv-body" id="pv-body"></div>
+    </div>
   </div>
 
   <div class="ed-toast" id="toast" role="status"></div>
